@@ -32,6 +32,17 @@ pre-commit install
 ```
 
 
+### Java 8 Upgrade
+
+This project has been upgraded to Java 8. Key changes include:
+
+- **java.time API**: Replaced joda-time `DateTime` with `java.time.Instant` and joda-time `Interval` with a custom `TimeInterval` class across the codebase
+- **Lambda expressions**: Replaced anonymous inner classes (e.g., `Comparator`, Mockito `Answer`) with lambda expressions
+- **Method references**: Applied method references where applicable for improved readability
+- **Clock injection**: Introduced `java.time.Clock` injection in `AutoPromoter` for improved testability (replacing global `DateTimeUtils` mocking)
+
+**Requirements**: Java 8 JDK or higher is required to build and run this project.
+
 ### Documentation
 
 [Check out our wiki!](https://github.com/pinterest/teletraan/wiki)

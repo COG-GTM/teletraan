@@ -57,6 +57,7 @@ import com.pinterest.deployservice.bean.TokenRolesBean;
 import com.pinterest.deployservice.bean.UserRolesBean;
 import com.pinterest.deployservice.common.CommonUtils;
 import com.pinterest.deployservice.common.Constants;
+import com.pinterest.deployservice.common.TimeInterval;
 import com.pinterest.deployservice.dao.AgentDAO;
 import com.pinterest.deployservice.dao.AgentErrorDAO;
 import com.pinterest.deployservice.dao.BuildDAO;
@@ -88,8 +89,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -282,7 +281,7 @@ public class DBDAOTest {
         deployBean5.setAcc_status(AcceptanceStatus.ACCEPTED);
         deployDAO.update("d-5", deployBean5);
         List<DeployBean> beans =
-                deployDAO.getAcceptedDeploys("env-3", new Interval(0, Long.MAX_VALUE), 100);
+                deployDAO.getAcceptedDeploys("env-3", new TimeInterval(0, Long.MAX_VALUE), 100);
         assertEquals(beans.size(), 1);
         assertEquals(beans.get(0).getDeploy_id(), "d-5");
 
@@ -326,7 +325,8 @@ public class DBDAOTest {
         assertEquals(buildDAO.getBuildNames("sss-", 1, 100).size(), 2);
 
         List<BuildBean> buildBeans =
-                buildDAO.getAcceptedBuilds("sss-1", null, new Interval(now, Long.MAX_VALUE), 100);
+                buildDAO.getAcceptedBuilds(
+                        "sss-1", null, new TimeInterval(now, Long.MAX_VALUE), 100);
         assertEquals(buildBeans.size(), 2);
         BuildBean bean1 = buildBeans.get(0);
         assertEquals(bean1.getBuild_id(), "b-3");
@@ -368,7 +368,7 @@ public class DBDAOTest {
     @Test
     public void testDeployAcceptedDelayed() throws Exception {
         long sucDate = System.currentTimeMillis();
-        Interval interval = new Interval(sucDate - 1000, sucDate + 1000);
+        TimeInterval interval = new TimeInterval(sucDate - 1000, sucDate + 1000);
         DeployBean deployBean =
                 genDefaultDeployBean("d-1", "env-1", "bbb-1", 1000, DeployState.SUCCEEDED);
         deployBean.setAcc_status(AcceptanceStatus.ACCEPTED);

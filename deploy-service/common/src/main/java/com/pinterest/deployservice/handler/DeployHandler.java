@@ -45,6 +45,7 @@ import com.pinterest.deployservice.common.Constants;
 import com.pinterest.deployservice.common.DeployInternalException;
 import com.pinterest.deployservice.common.InvalidBuildException;
 import com.pinterest.deployservice.common.StateMachines;
+import com.pinterest.deployservice.common.TimeInterval;
 import com.pinterest.deployservice.common.WebhookDataFactory;
 import com.pinterest.deployservice.dao.AgentDAO;
 import com.pinterest.deployservice.dao.BuildDAO;
@@ -57,22 +58,21 @@ import com.pinterest.deployservice.db.DatabaseUtil;
 import com.pinterest.deployservice.db.DeployQueryFilter;
 import com.pinterest.deployservice.scm.SourceControlManagerProxy;
 import com.pinterest.teletraan.universal.http.HttpClient;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.Interval;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -291,15 +291,12 @@ public class DeployHandler implements DeployHandlerInterface {
                             oldBuildBean.getScm_commit(),
                             0);
 
-            Set<String> authors = new HashSet<>();
-            for (CommitBean commit : commits) {
-                if (commit.getAuthor().equalsIgnoreCase("unknown")) {
-                    // ignore unknown authors
-                    continue;
-                }
-                // TODO hipchat is different, screw it for now
-                authors.add(String.format("<@%s|%s>", commit.getAuthor(), commit.getAuthor()));
-            }
+            Set<String> authors =
+                    commits.stream()
+                            .map(CommitBean::getAuthor)
+                            .filter(author -> !author.equalsIgnoreCase("unknown"))
+                            .map(author -> String.format("<@%s|%s>", author, author))
+                            .collect(Collectors.toSet());
 
             String mentions = Joiner.on(",").join(authors);
             String compareUrl =
@@ -683,11 +680,12 @@ public class DeployHandler implements DeployHandlerInterface {
     }
 
     public List<DeployBean> getDeployCandidates(
-            String envId, Interval interval, int size, boolean onlyGoodBuilds) throws Exception {
+            String envId, TimeInterval interval, int size, boolean onlyGoodBuilds)
+            throws Exception {
         LOG.info(
                 "Search Deploy candidates between {} and {} for environment {}",
-                interval.getStart().toString(ISODateTimeFormat.dateTime()),
-                interval.getEnd().toString(ISODateTimeFormat.dateTime()),
+                DateTimeFormatter.ISO_INSTANT.format(interval.getStart()),
+                DateTimeFormatter.ISO_INSTANT.format(interval.getEnd()),
                 envId);
         List<DeployBean> taggedGoodDeploys = new ArrayList<>();
 

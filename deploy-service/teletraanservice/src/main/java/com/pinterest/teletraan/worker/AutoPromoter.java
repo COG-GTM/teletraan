@@ -22,6 +22,7 @@ import com.pinterest.deployservice.buildtags.BuildTagsManager;
 import com.pinterest.deployservice.buildtags.BuildTagsManagerImpl;
 import com.pinterest.deployservice.common.Constants;
 import com.pinterest.deployservice.common.StateMachines;
+import com.pinterest.deployservice.common.TimeInterval;
 import com.pinterest.deployservice.dao.BuildDAO;
 import com.pinterest.deployservice.dao.DeployDAO;
 import com.pinterest.deployservice.dao.EnvironDAO;
@@ -32,12 +33,12 @@ import com.pinterest.teletraan.universal.metrics.ErrorBudgetCounterFactory;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import java.sql.Connection;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
-import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,7 @@ public class AutoPromoter implements Runnable {
     private DeployHandler deployHandler;
     private BuildTagsManager buildTagsManager;
     private int bufferTimeMinutes;
+    private Clock clock = Clock.systemUTC();
     private final int maxCheckBuildsOrDeploys = 100;
     private Counter errorBudgetSuccess;
     private Counter errorBudgetFailure;
@@ -80,6 +82,12 @@ public class AutoPromoter implements Runnable {
 
     public AutoPromoter withBufferTimeMinutes(int bufferTime) {
         bufferTimeMinutes = bufferTime;
+        return this;
+    }
+
+    /** Package-private setter for injecting a Clock in tests. */
+    AutoPromoter withClock(Clock clock) {
+        this.clock = clock;
         return this;
     }
 
@@ -124,7 +132,7 @@ public class AutoPromoter implements Runnable {
     }
 
     long getEndTime(PromoteBean bean) {
-        long ret = DateTime.now().getMillis();
+        long ret = clock.millis();
         if (bean.getDelay() != null && bean.getDelay() > 0) {
             ret -= bean.getDelay() * 60 * 1000;
         }
@@ -144,19 +152,22 @@ public class AutoPromoter implements Runnable {
         // time per schedule for the build.
         CronExpression cronExpression = new CronExpression(promoteBean.getSchedule());
         for (E bean : candidates) {
-            DateTime checkTime = new DateTime(timeSupplier.apply(bean));
+            Instant checkTime = Instant.ofEpochMilli(timeSupplier.apply(bean));
             if (promoteBean.getDelay() > 0) {
-                checkTime.plusMinutes(promoteBean.getDelay());
+                checkTime = checkTime.plusSeconds(promoteBean.getDelay() * 60L);
             }
-            DateTime autoDeployDueDate =
-                    new DateTime(cronExpression.getNextValidTimeAfter(checkTime.toDate()));
+            Instant autoDeployDueDate =
+                    Instant.ofEpochMilli(
+                            cronExpression
+                                    .getNextValidTimeAfter(java.util.Date.from(checkTime))
+                                    .getTime());
             LOG.info(
                     "Auto deploy due time is {} for check time {} for Environment {}",
-                    autoDeployDueDate.toString(ISODateTimeFormat.dateTime()),
+                    DateTimeFormatter.ISO_INSTANT.format(autoDeployDueDate),
                     checkTime,
                     currEnvBean.getEnv_name());
 
-            if (!autoDeployDueDate.isAfterNow()) {
+            if (!autoDeployDueDate.isAfter(clock.instant())) {
                 ret = bean;
                 break;
             }
@@ -243,11 +254,15 @@ public class AutoPromoter implements Runnable {
     // true only between 10:00 (included) and 10:00 + bufferTimeMinutes (excluded).
     boolean isWithinScheduledWindow(String schedule) throws Exception {
         CronExpression cronExpression = new CronExpression(schedule);
-        DateTime nextDueTime =
-                new DateTime(
-                        cronExpression.getTimeAfter(
-                                DateTime.now().minusMinutes(bufferTimeMinutes).toDate()));
-        return !nextDueTime.isAfterNow();
+        Instant nextDueTime =
+                Instant.ofEpochMilli(
+                        cronExpression
+                                .getTimeAfter(
+                                        java.util.Date.from(
+                                                clock.instant()
+                                                        .minusSeconds(bufferTimeMinutes * 60L)))
+                                .getTime());
+        return !nextDueTime.isAfter(clock.instant());
     }
 
     // This contains the logic about if there is build should be promoted
@@ -279,7 +294,7 @@ public class AutoPromoter implements Runnable {
         // It is either Long.MAX_VALUE (Get all builds) or the due time for scheduled deployment
         List<BuildBean> buildBeans =
                 getBuildCandidates(
-                        currEnvBean, new Interval(startTime, endTime), maxCheckBuildsOrDeploys);
+                        currEnvBean, new TimeInterval(startTime, endTime), maxCheckBuildsOrDeploys);
         if (buildBeans.size() < size) {
             return new PromoteResult().withResultCode(PromoteResult.ResultCode.NoAvailableBuild);
         }
@@ -371,7 +386,7 @@ public class AutoPromoter implements Runnable {
         List<DeployBean> deployCandidates =
                 getDeployCandidates(
                         precededEnvBean.getEnv_id(),
-                        new Interval(startTime, endTime),
+                        new TimeInterval(startTime, endTime),
                         maxCheckBuildsOrDeploys);
 
         if (deployCandidates.size() < size) {
@@ -514,7 +529,7 @@ public class AutoPromoter implements Runnable {
      * @return
      * @throws Exception
      */
-    List<BuildBean> getBuildCandidates(EnvironBean envBean, Interval interval, int size)
+    List<BuildBean> getBuildCandidates(EnvironBean envBean, TimeInterval interval, int size)
             throws Exception {
         // By default, buildName is the same as envName
         String buildName = envBean.getBuild_name();
@@ -530,8 +545,8 @@ public class AutoPromoter implements Runnable {
                 availableBuilds.size(),
                 buildName,
                 scmBranch,
-                interval.getStart(),
-                interval.getEnd());
+                DateTimeFormatter.ISO_INSTANT.format(interval.getStart()),
+                DateTimeFormatter.ISO_INSTANT.format(interval.getEnd()));
         if (!availableBuilds.isEmpty()) {
             List<BuildTagBean> buildTagBeanList =
                     buildTagsManager.getEffectiveTagsWithBuilds(availableBuilds);
@@ -549,15 +564,9 @@ public class AutoPromoter implements Runnable {
             }
         }
         // should order build bean ORDER BY publish_date DESC
-        if (taggedGoodBuilds.size() > 0) {
-            Collections.sort(
-                    taggedGoodBuilds,
-                    new Comparator<BuildBean>() {
-                        @Override
-                        public int compare(final BuildBean d1, final BuildBean d2) {
-                            return Long.compare(d2.getPublish_date(), d1.getPublish_date());
-                        }
-                    });
+        if (!taggedGoodBuilds.isEmpty()) {
+            taggedGoodBuilds.sort(
+                    (d1, d2) -> Long.compare(d2.getPublish_date(), d1.getPublish_date()));
             LOG.info(
                     "Env {} the first build candidate is {}",
                     envBean.getEnv_id(),
@@ -575,7 +584,7 @@ public class AutoPromoter implements Runnable {
      * @return
      * @throws Exception
      */
-    List<DeployBean> getDeployCandidates(String envId, Interval interval, int size)
+    List<DeployBean> getDeployCandidates(String envId, TimeInterval interval, int size)
             throws Exception {
         return deployHandler.getDeployCandidates(envId, interval, size, true);
     }
@@ -656,7 +665,7 @@ public class AutoPromoter implements Runnable {
 
     @Override
     public void run() {
-        WORKER_TIMER.record(() -> runInternal());
+        WORKER_TIMER.record(this::runInternal);
     }
 
     private void runInternal() {

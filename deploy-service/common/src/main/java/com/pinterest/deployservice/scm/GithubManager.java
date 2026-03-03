@@ -23,6 +23,8 @@ import com.pinterest.deployservice.common.KeyReader;
 import com.pinterest.deployservice.common.KnoxKeyReader;
 import com.pinterest.teletraan.universal.http.HttpClient;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -30,9 +32,6 @@ import java.util.Queue;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
 import org.kohsuke.github.GHAppInstallation;
 import org.kohsuke.github.GHAppInstallationToken;
 import org.kohsuke.github.GitHub;
@@ -138,9 +137,8 @@ public class GithubManager extends BaseManager {
     private long getDate(Map<String, Object> jsonMap) {
         Map<String, Object> commiterMap = (Map<String, Object>) jsonMap.get("committer");
         String dateGMTStr = (String) commiterMap.get("date");
-        DateTimeFormatter parser = ISODateTimeFormat.dateTimeNoMillis();
-        DateTime dt = parser.parseDateTime(dateGMTStr);
-        return dt.getMillis();
+        Instant dt = Instant.from(DateTimeFormatter.ISO_DATE_TIME.parse(dateGMTStr));
+        return dt.toEpochMilli();
     }
 
     private String getMessage(Map<String, Object> jsonMap) {

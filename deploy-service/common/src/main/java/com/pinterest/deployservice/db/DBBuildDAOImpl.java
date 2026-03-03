@@ -18,6 +18,7 @@ package com.pinterest.deployservice.db;
 import com.google.common.base.Optional;
 import com.pinterest.deployservice.bean.BuildBean;
 import com.pinterest.deployservice.bean.SetClause;
+import com.pinterest.deployservice.common.TimeInterval;
 import com.pinterest.deployservice.dao.BuildDAO;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +29,6 @@ import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.Interval;
 
 public class DBBuildDAOImpl implements BuildDAO {
 
@@ -200,7 +200,7 @@ public class DBBuildDAOImpl implements BuildDAO {
 
     @Override
     public List<BuildBean> getAcceptedBuilds(
-            String buildName, String branch, Interval interval, int limit) throws Exception {
+            String buildName, String branch, TimeInterval interval, int limit) throws Exception {
         ResultSetHandler<List<BuildBean>> h = new BeanListHandler<>(BuildBean.class);
         if (StringUtils.isNotEmpty(branch)) {
             return new QueryRunner(dataSource)

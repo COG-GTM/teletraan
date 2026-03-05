@@ -40,6 +40,7 @@ public class SMTPMailManagerImpl implements MailManager {
      * usually <tt>localhost</tt>.
      */
     private String host;
+
     /**
      * The SMTP port to use for sending e-mail. Null for default to the environment, which is
      * usually <tt>25</tt>.

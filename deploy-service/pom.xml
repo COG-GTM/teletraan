@@ -11,19 +11,19 @@
     <inceptionYear>2014</inceptionYear>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <encoding>UTF-8</encoding>
         <project.build_id.sourceEncoding>UTF-8</project.build_id.sourceEncoding>
         <micrometer.version>1.11.3</micrometer.version>
         <dropwizard.version>2.1.11</dropwizard.version>
         <junit-jupiter.version>5.10.1</junit-jupiter.version>
-        <googleJavaFormat.version>1.7</googleJavaFormat.version>
-        <spotless.version>2.30.0</spotless.version>
+        <googleJavaFormat.version>1.19.2</googleJavaFormat.version>
+        <spotless.version>2.43.0</spotless.version>
         <okhttp.version>4.12.0</okhttp.version>
-        <lombok.version>1.18.28</lombok.version>
-        <aspectj.version>1.9.7</aspectj.version>
-        <aspectj-maven-plugin.version>1.15.0</aspectj-maven-plugin.version>
+        <lombok.version>1.18.30</lombok.version>
+        <aspectj.version>1.9.22</aspectj.version>
+        <aspectj-maven-plugin.version>1.14.1</aspectj-maven-plugin.version>
         <source_dir>${maven.repo.local}/com/pinterest/teletraan/${project.artifactId}/${project.version}</source_dir>
     </properties>
 
@@ -110,9 +110,16 @@
                     <version>0.8.9</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
+                    <groupId>dev.aspectj</groupId>
                     <artifactId>aspectj-maven-plugin</artifactId>
                     <version>${aspectj-maven-plugin.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.aspectj</groupId>
+                            <artifactId>aspectjtools</artifactId>
+                            <version>${aspectj.version}</version>
+                        </dependency>
+                    </dependencies>
                     <executions>
                         <execution>
                             <id>default-compile</id>
@@ -149,9 +156,9 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.14.0</version>
                     <configuration>
-                        <release>8</release>
-                        <source>8</source>
-                        <target>8</target>
+                        <release>21</release>
+                        <source>21</source>
+                        <target>21</target>
                     </configuration>
                 </plugin>
                 <plugin>

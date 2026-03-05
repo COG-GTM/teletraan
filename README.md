@@ -18,6 +18,11 @@ Teletraan is designed to be a flexible building block. You can plug Teletraan in
 
 Check out [Integrate with Teletraan](https://github.com/pinterest/teletraan/wiki/Integrate-with-teletraan) for more details.
 
+### Prerequisites
+
+* Java 21 or later
+* Maven 3.9+
+
 ### Quick start
 
 [Quick start guide!](https://github.com/pinterest/teletraan/wiki/Quickstart-Guide)

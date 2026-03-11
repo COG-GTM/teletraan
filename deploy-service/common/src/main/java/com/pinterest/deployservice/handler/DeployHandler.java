@@ -57,6 +57,9 @@ import com.pinterest.deployservice.db.DatabaseUtil;
 import com.pinterest.deployservice.db.DeployQueryFilter;
 import com.pinterest.deployservice.scm.SourceControlManagerProxy;
 import com.pinterest.teletraan.universal.http.HttpClient;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -71,8 +74,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.Interval;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -683,15 +684,19 @@ public class DeployHandler implements DeployHandlerInterface {
     }
 
     public List<DeployBean> getDeployCandidates(
-            String envId, Interval interval, int size, boolean onlyGoodBuilds) throws Exception {
+            String envId, long startMillis, long endMillis, int size, boolean onlyGoodBuilds)
+            throws Exception {
         LOG.info(
                 "Search Deploy candidates between {} and {} for environment {}",
-                interval.getStart().toString(ISODateTimeFormat.dateTime()),
-                interval.getEnd().toString(ISODateTimeFormat.dateTime()),
+                DateTimeFormatter.ISO_INSTANT.format(
+                        Instant.ofEpochMilli(startMillis).atZone(ZoneOffset.UTC)),
+                DateTimeFormatter.ISO_INSTANT.format(
+                        Instant.ofEpochMilli(endMillis).atZone(ZoneOffset.UTC)),
                 envId);
         List<DeployBean> taggedGoodDeploys = new ArrayList<>();
 
-        List<DeployBean> availableDeploys = deployDAO.getAcceptedDeploys(envId, interval, size);
+        List<DeployBean> availableDeploys =
+                deployDAO.getAcceptedDeploys(envId, startMillis, endMillis, size);
 
         if (!onlyGoodBuilds) {
             return availableDeploys;

@@ -40,7 +40,6 @@ import com.pinterest.deployservice.dao.HostTagDAO;
 import io.micrometer.core.instrument.Metrics;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -978,13 +977,13 @@ public class GoalAnalyst {
             // TODO the current thinking is not to shuffle the candidates so we
             // can get consistent results, we will see if this is a good idea
             // Collections.shuffle(installCandidates);
-            Collections.sort(installCandidates);
+            installCandidates.sort(null);
         }
 
         // Sort the uninstall candidates
         if (uninstallCandidates.size() > 1) {
             // Collections.shuffle(uninstallCandidates);
-            Collections.sort(uninstallCandidates);
+            uninstallCandidates.sort(null);
         }
     }
 }

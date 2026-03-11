@@ -26,7 +26,6 @@ import com.pinterest.deployservice.bean.TagTargetType;
 import com.pinterest.deployservice.dao.TagDAO;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
@@ -108,14 +107,10 @@ public class BuildTagsManagerImpl implements BuildTagsManager {
                 Collections.binarySearch(
                         tags,
                         dummy,
-                        new Comparator<BuildTagBean>() {
-                            @Override
-                            public int compare(BuildTagBean o1, BuildTagBean o2) {
-                                return o1.getBuild()
+                        (o1, o2) ->
+                                o1.getBuild()
                                         .getCommit_date()
-                                        .compareTo(o2.getBuild().getCommit_date());
-                            }
-                        });
+                                        .compareTo(o2.getBuild().getCommit_date()));
         LOG.debug("Binary search returns {}", insert);
 
         // insert will be the (-(insertion point)-1) if not found. Insertion point is the index of
@@ -158,23 +153,17 @@ public class BuildTagsManagerImpl implements BuildTagsManager {
     public static List<BuildTagBean> sortAndDedupTags(List<BuildTagBean> buildTagBeanList)
             throws Exception {
         // Sort by commit date for later search
-        Collections.sort(
-                buildTagBeanList,
-                new Comparator<BuildTagBean>() {
-                    @Override
-                    public int compare(BuildTagBean o1, BuildTagBean o2) {
-                        if (!o1.getBuild()
+        buildTagBeanList.sort(
+                (o1, o2) -> {
+                    if (!o1.getBuild().getCommit_date().equals(o2.getBuild().getCommit_date())) {
+                        return o1.getBuild()
                                 .getCommit_date()
-                                .equals(o2.getBuild().getCommit_date())) {
-                            return o1.getBuild()
-                                    .getCommit_date()
-                                    .compareTo(o2.getBuild().getCommit_date());
-                        } else {
-                            // Same commit. sort by created date
-                            return o1.getTag()
-                                    .getCreated_date()
-                                    .compareTo(o2.getTag().getCreated_date());
-                        }
+                                .compareTo(o2.getBuild().getCommit_date());
+                    } else {
+                        // Same commit. sort by created date
+                        return o1.getTag()
+                                .getCreated_date()
+                                .compareTo(o2.getTag().getCreated_date());
                     }
                 });
 

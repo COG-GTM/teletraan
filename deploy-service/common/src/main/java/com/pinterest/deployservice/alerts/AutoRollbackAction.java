@@ -17,10 +17,10 @@ package com.pinterest.deployservice.alerts;
 
 import com.pinterest.deployservice.bean.DeployBean;
 import com.pinterest.deployservice.bean.EnvironBean;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,9 +48,12 @@ public class AutoRollbackAction extends AlertAction {
                 context.getDeployHandler()
                         .getDeployCandidates(
                                 environ.getEnv_id(),
-                                new Interval(
-                                        DateTime.now().minusDays(MaxLookbackDays),
-                                        DateTime.now().minusSeconds(actionWindowInSeconds)),
+                                Instant.now()
+                                        .minus(Duration.ofDays(MaxLookbackDays))
+                                        .toEpochMilli(),
+                                Instant.now()
+                                        .minus(Duration.ofSeconds(actionWindowInSeconds))
+                                        .toEpochMilli(),
                                 MaxDeploysToCheck,
                                 true);
         // Result sorted desending on start date

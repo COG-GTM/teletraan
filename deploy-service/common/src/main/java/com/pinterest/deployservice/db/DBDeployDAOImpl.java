@@ -34,7 +34,6 @@ import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.Interval;
 
 public class DBDeployDAOImpl implements DeployDAO {
 
@@ -196,15 +195,13 @@ public class DBDeployDAOImpl implements DeployDAO {
     }
 
     @Override
-    public List<DeployBean> getAcceptedDeploys(String envId, Interval interval, int size)
-            throws Exception {
+    public List<DeployBean> getAcceptedDeploys(
+            String envId, long startMillis, long endMillis, int size) throws Exception {
         ResultSetHandler<List<DeployBean>> h = new BeanListHandler<>(DeployBean.class);
         String typesClause =
                 QueryUtils.genEnumGroupClause(StateMachines.AUTO_PROMOTABLE_DEPLOY_TYPE);
         List<Object> params =
-                ImmutableList.builder()
-                        .add(envId, interval.getStartMillis(), interval.getEndMillis(), size)
-                        .build();
+                ImmutableList.builder().add(envId, startMillis, endMillis, size).build();
         return new QueryRunner(dataSource)
                 .query(
                         String.format(GET_ACCEPTED_DEPLOYS_TEMPLATE, typesClause),
@@ -213,16 +210,11 @@ public class DBDeployDAOImpl implements DeployDAO {
     }
 
     @Override
-    public List<DeployBean> getAcceptedDeploysDelayed(String envId, Interval interval)
-            throws Exception {
+    public List<DeployBean> getAcceptedDeploysDelayed(
+            String envId, long startMillis, long endMillis) throws Exception {
         ResultSetHandler<List<DeployBean>> h = new BeanListHandler<>(DeployBean.class);
         return new QueryRunner(dataSource)
-                .query(
-                        GET_ACCEPTED_DEPLOYS_DELAYED_TEMPLATE,
-                        h,
-                        envId,
-                        interval.getStartMillis(),
-                        interval.getEndMillis());
+                .query(GET_ACCEPTED_DEPLOYS_DELAYED_TEMPLATE, h, envId, startMillis, endMillis);
     }
 
     @Override

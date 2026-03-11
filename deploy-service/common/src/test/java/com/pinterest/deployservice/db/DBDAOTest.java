@@ -79,6 +79,7 @@ import com.pinterest.deployservice.dao.UtilDAO;
 import com.pinterest.deployservice.fixture.EnvironBeanFixture;
 import com.pinterest.teletraan.universal.security.bean.AuthZResource;
 import java.sql.Connection;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -88,8 +89,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -281,8 +280,7 @@ public class DBDAOTest {
 
         deployBean5.setAcc_status(AcceptanceStatus.ACCEPTED);
         deployDAO.update("d-5", deployBean5);
-        List<DeployBean> beans =
-                deployDAO.getAcceptedDeploys("env-3", new Interval(0, Long.MAX_VALUE), 100);
+        List<DeployBean> beans = deployDAO.getAcceptedDeploys("env-3", 0, Long.MAX_VALUE, 100);
         assertEquals(beans.size(), 1);
         assertEquals(beans.get(0).getDeploy_id(), "d-5");
 
@@ -326,7 +324,7 @@ public class DBDAOTest {
         assertEquals(buildDAO.getBuildNames("sss-", 1, 100).size(), 2);
 
         List<BuildBean> buildBeans =
-                buildDAO.getAcceptedBuilds("sss-1", null, new Interval(now, Long.MAX_VALUE), 100);
+                buildDAO.getAcceptedBuilds("sss-1", null, now, Long.MAX_VALUE, 100);
         assertEquals(buildBeans.size(), 2);
         BuildBean bean1 = buildBeans.get(0);
         assertEquals(bean1.getBuild_id(), "b-3");
@@ -368,7 +366,6 @@ public class DBDAOTest {
     @Test
     public void testDeployAcceptedDelayed() throws Exception {
         long sucDate = System.currentTimeMillis();
-        Interval interval = new Interval(sucDate - 1000, sucDate + 1000);
         DeployBean deployBean =
                 genDefaultDeployBean("d-1", "env-1", "bbb-1", 1000, DeployState.SUCCEEDED);
         deployBean.setAcc_status(AcceptanceStatus.ACCEPTED);
@@ -376,7 +373,8 @@ public class DBDAOTest {
         deployBean.setSuc_date(sucDate);
         deployDAO.insert(deployBean);
         List<DeployBean> acceptedDeploysDelayed =
-                deployDAO.getAcceptedDeploysDelayed(deployBean.getEnv_id(), interval);
+                deployDAO.getAcceptedDeploysDelayed(
+                        deployBean.getEnv_id(), sucDate - 1000, sucDate + 1000);
         assertEquals(1, acceptedDeploysDelayed.size());
         assertEquals(deployBean.getDeploy_id(), acceptedDeploysDelayed.get(0).getDeploy_id());
     }
@@ -440,7 +438,7 @@ public class DBDAOTest {
         hostTagBean.setEnv_id("e-2");
         hostTagBean.setTag_name("tag-1");
         hostTagBean.setTag_value("value-1");
-        hostTagBean.setCreate_date(DateTime.now().getMillis());
+        hostTagBean.setCreate_date(Instant.now().toEpochMilli());
         hostTagDAO.insertOrUpdate(hostTagBean);
         hostTagBean.setHost_id("host-2");
         hostTagBean.setTag_value("value-2");
@@ -466,7 +464,7 @@ public class DBDAOTest {
         hostTagBean.setEnv_id("e-2");
         hostTagBean.setTag_name("tag-1");
         hostTagBean.setTag_value("value-1");
-        hostTagBean.setCreate_date(DateTime.now().getMillis());
+        hostTagBean.setCreate_date(Instant.now().toEpochMilli());
         hostTagDAO.insertOrUpdate(hostTagBean);
         hostTagBean.setHost_id("host-2");
         hostTagBean.setTag_value("value-2");

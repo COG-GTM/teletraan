@@ -19,7 +19,8 @@ import com.google.common.io.BaseEncoding;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -63,7 +64,7 @@ public class CommonUtils {
     }
 
     public static Map<String, String> encodeScript(Map<String, String> data) throws Exception {
-        Map<String, String> encoded = new HashMap<String, String>(data.size());
+        Map<String, String> encoded = new HashMap<>(data.size());
         for (Map.Entry<String, String> entry : data.entrySet()) {
             encoded.put(
                     entry.getKey(),
@@ -73,7 +74,7 @@ public class CommonUtils {
     }
 
     public static Map<String, String> decodeScript(Map<String, String> data) throws Exception {
-        Map<String, String> decoded = new HashMap<String, String>(data.size());
+        Map<String, String> decoded = new HashMap<>(data.size());
         for (Map.Entry<String, String> entry : data.entrySet()) {
             decoded.put(
                     entry.getKey(),
@@ -91,8 +92,8 @@ public class CommonUtils {
     }
 
     public static Long convertDateStringToMilliseconds(String dateString) throws Exception {
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:SS");
-        Date date = formatter.parse(dateString);
-        return date.getTime();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:SS");
+        LocalDateTime dateTime = LocalDateTime.parse(dateString, formatter);
+        return java.sql.Timestamp.valueOf(dateTime).getTime();
     }
 }

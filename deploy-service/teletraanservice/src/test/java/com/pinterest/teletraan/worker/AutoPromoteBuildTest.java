@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -147,7 +148,7 @@ public class AutoPromoteBuildTest {
         when(tagDAO.getLatestByTargetIdAndType(
                         buildName, TagTargetType.BUILD, BuildTagsManagerImpl.MAXCHECKTAGS))
                 .thenReturn(new ArrayList<TagBean>(Arrays.asList(tagBean)));
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(t9AMBuildBean));
         PromoteResult result =
                 promoter.computePromoteBuildResult(environBean, null, 1, promoteBean);
@@ -194,7 +195,7 @@ public class AutoPromoteBuildTest {
                         BuildTagsManagerImpl.MAXCHECKTAGS))
                 .thenReturn(new ArrayList<TagBean>(Arrays.asList(tagBean)));
 
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(build1, build2));
         // build1 is bad
         when(buildTagsManager.getEffectiveTagsWithBuilds(Arrays.asList(build1)))
@@ -268,7 +269,7 @@ public class AutoPromoteBuildTest {
         AutoPromoter promoter = createPromoterWithClock(t10AM.toEpochMilli());
         // Has builds. Have previous deploy
 
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(t9AMBuildBean));
         PromoteResult result =
                 promoter.computePromoteBuildResult(environBean, null, 1, t10AMPromoteBean);
@@ -288,7 +289,7 @@ public class AutoPromoteBuildTest {
         build.setBuild_id("123");
         build.setPublish_date(t10AM.plusSeconds(60).toEpochMilli());
 
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(build));
         PromoteResult result =
                 promoter.computePromoteBuildResult(environBean, null, 1, t10AMPromoteBean);
@@ -341,7 +342,7 @@ public class AutoPromoteBuildTest {
         previousDeploy.setBuild_id(t8AMBuildBean.getBuild_id());
 
         when(buildDAO.getById(t8AMBuildBean.getBuild_id())).thenReturn(t8AMBuildBean);
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(t9AMBuildBean));
         PromoteResult result =
                 promoter.computePromoteBuildResult(
@@ -398,7 +399,7 @@ public class AutoPromoteBuildTest {
     public void testPromotionOnlyHappensWithinBufferTimeWindow() throws Exception {
         int bufferTimeMinutes = 1;
 
-        when(buildDAO.getAcceptedBuilds(any(), any(), any(), anyInt()))
+        when(buildDAO.getAcceptedBuilds(any(), any(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(t9AMBuildBean));
 
         // Set time to 9:01 AM, before scheduled time

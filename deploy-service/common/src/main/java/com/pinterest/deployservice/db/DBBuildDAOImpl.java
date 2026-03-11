@@ -28,7 +28,6 @@ import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.Interval;
 
 public class DBBuildDAOImpl implements BuildDAO {
 
@@ -200,7 +199,8 @@ public class DBBuildDAOImpl implements BuildDAO {
 
     @Override
     public List<BuildBean> getAcceptedBuilds(
-            String buildName, String branch, Interval interval, int limit) throws Exception {
+            String buildName, String branch, long startMillis, long endMillis, int limit)
+            throws Exception {
         ResultSetHandler<List<BuildBean>> h = new BeanListHandler<>(BuildBean.class);
         if (StringUtils.isNotEmpty(branch)) {
             return new QueryRunner(dataSource)
@@ -209,8 +209,8 @@ public class DBBuildDAOImpl implements BuildDAO {
                             h,
                             buildName,
                             branch,
-                            interval.getStartMillis(),
-                            interval.getEndMillis(),
+                            startMillis,
+                            endMillis,
                             limit);
         } else {
             return new QueryRunner(dataSource)
@@ -218,8 +218,8 @@ public class DBBuildDAOImpl implements BuildDAO {
                             GET_ACCEPTED_BUILDS_BETWEEN_TEMPLATE,
                             h,
                             buildName,
-                            interval.getStartMillis(),
-                            interval.getEndMillis(),
+                            startMillis,
+                            endMillis,
                             limit);
         }
     }

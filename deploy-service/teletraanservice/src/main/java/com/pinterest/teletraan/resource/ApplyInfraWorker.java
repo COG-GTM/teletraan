@@ -39,9 +39,9 @@ import com.pinterest.teletraan.worker.WorkerTimerFactory;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import java.sql.Connection;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -302,7 +302,8 @@ public class ApplyInfraWorker implements Runnable {
      * any actionId string over 256 characters will throw from Rodimus & fail the task.
      */
     private String generateScheduledActionName(String clusterName, Integer count) {
-        String timestamp = new SimpleDateFormat("yyMMdd-HHmmssSSS").format(new Date());
+        String timestamp =
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd-HHmmssSSS"));
         return String.format("%s-%s-%d", clusterName, timestamp, count);
     }
 

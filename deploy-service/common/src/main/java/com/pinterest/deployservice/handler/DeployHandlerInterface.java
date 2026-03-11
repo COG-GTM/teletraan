@@ -18,12 +18,12 @@ package com.pinterest.deployservice.handler;
 import com.pinterest.deployservice.bean.DeployBean;
 import com.pinterest.deployservice.bean.EnvironBean;
 import java.util.List;
-import org.joda.time.Interval;
 
 public interface DeployHandlerInterface {
     String rollback(EnvironBean envBean, String toDeployId, String description, String operator)
             throws Exception;
 
     List<DeployBean> getDeployCandidates(
-            String envId, Interval interval, int size, boolean onlyGoodBuilds) throws Exception;
+            String envId, long startMillis, long endMillis, int size, boolean onlyGoodBuilds)
+            throws Exception;
 }

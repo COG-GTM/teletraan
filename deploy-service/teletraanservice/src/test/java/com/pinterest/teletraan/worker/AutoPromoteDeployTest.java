@@ -16,8 +16,8 @@
 package com.pinterest.teletraan.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,18 +40,17 @@ import com.pinterest.deployservice.dao.BuildDAO;
 import com.pinterest.deployservice.dao.DeployDAO;
 import com.pinterest.deployservice.dao.EnvironDAO;
 import com.pinterest.deployservice.dao.TagDAO;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 public class AutoPromoteDeployTest {
 
@@ -69,14 +68,13 @@ public class AutoPromoteDeployTest {
     BuildTagsManager buildTagsManager;
     List<DeployBean> allDeployBeans = new ArrayList<>();
 
-    public List<DeployBean> getAcceptedDeploysDelayed(String envId, Interval interval) {
+    public List<DeployBean> getAcceptedDeploysDelayed(
+            String envId, long startMillis, long endMillis) {
         List<DeployBean> ret = new ArrayList<>();
         for (DeployBean bean : allDeployBeans) {
             if (bean.getEnv_id().equals(envId)
-                    && interval.contains(bean.getStart_date())
-                    &&
-                    // contains is inclusive for beginning
-                    interval.getStartMillis() != bean.getStart_date()) {
+                    && bean.getStart_date() > startMillis
+                    && bean.getStart_date() < endMillis) {
                 ret.add(bean);
             }
         }
@@ -135,7 +133,7 @@ public class AutoPromoteDeployTest {
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setPred_stage("pred");
         promoteBean.setDelay(100); // minutes
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
 
         String badBuildId = "badbuild1";
         String goodBuildId = "goodBuild2";
@@ -143,8 +141,8 @@ public class AutoPromoteDeployTest {
         BuildBean badBuild = new BuildBean();
         badBuild.setBuild_id(badBuildId);
         badBuild.setBuild_name(badBuildId);
-        badBuild.setCommit_date(now.minusHours(24).getMillis());
-        badBuild.setPublish_date(now.minusHours(24).getMillis());
+        badBuild.setCommit_date(now.minusSeconds(86400).toEpochMilli());
+        badBuild.setPublish_date(now.minusSeconds(86400).toEpochMilli());
         badBuild.setScm_commit("abcde");
 
         TagBean tagBean = new TagBean();
@@ -159,14 +157,14 @@ public class AutoPromoteDeployTest {
         DeployBean prevDeploy = new DeployBean();
         prevDeploy.setDeploy_id("deploy1");
         prevDeploy.setEnv_id(predEnvironBean.getEnv_id());
-        prevDeploy.setStart_date(now.minusHours(23).getMillis());
+        prevDeploy.setStart_date(now.minusSeconds(82800).toEpochMilli());
         prevDeploy.setBuild_id(badBuildId);
 
         DeployBean currentDeploy = new DeployBean();
         currentDeploy.setDeploy_id("deploy2");
         currentDeploy.setFrom_deploy(prevDeploy.getDeploy_id());
         currentDeploy.setEnv_id(environBean.getEnv_id());
-        currentDeploy.setStart_date(now.minusHours(22).plusMinutes(40).getMillis());
+        currentDeploy.setStart_date(now.minusSeconds(76800).toEpochMilli());
         currentDeploy.setBuild_id(goodBuildId);
 
         allDeployBeans.add(prevDeploy);
@@ -174,7 +172,7 @@ public class AutoPromoteDeployTest {
 
         when(deployDAO.getById("deploy1")).thenReturn(prevDeploy);
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(Arrays.asList(prevDeploy));
         when(buildDAO.getBuildsFromIds(new HashSet<>(Arrays.asList(badBuildId))))
                 .thenReturn(Arrays.asList(badBuild));
@@ -223,7 +221,7 @@ public class AutoPromoteDeployTest {
     */
     @Test
     public void testPredDeployAlreadyPromote() throws Exception {
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setPred_stage("pred");
         promoteBean.setDelay(0); // minutes
@@ -231,25 +229,21 @@ public class AutoPromoteDeployTest {
         DeployBean prevDeploy = new DeployBean();
         prevDeploy.setDeploy_id("deploy1");
         prevDeploy.setEnv_id(predEnvironBean.getEnv_id());
-        prevDeploy.setStart_date(now.minusHours(26).getMillis());
+        prevDeploy.setStart_date(now.minusSeconds(93600).toEpochMilli());
         DeployBean currentDeploy = new DeployBean();
         currentDeploy.setDeploy_id("deploy2");
         currentDeploy.setFrom_deploy("deploy1");
-        currentDeploy.setStart_date(now.minusHours(25).getMillis());
+        currentDeploy.setStart_date(now.minusSeconds(90000).toEpochMilli());
         allDeployBeans.add(prevDeploy);
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
         when(deployDAO.getById("deploy1")).thenReturn(prevDeploy);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(
-                        new Answer<List<DeployBean>>() {
-                            @Override
-                            public List<DeployBean> answer(InvocationOnMock invocationOnMock)
-                                    throws Throwable {
-                                return getAcceptedDeploysDelayed(
+                        invocationOnMock ->
+                                getAcceptedDeploysDelayed(
                                         (String) invocationOnMock.getArguments()[0],
-                                        (Interval) invocationOnMock.getArguments()[1]);
-                            }
-                        });
+                                        (long) invocationOnMock.getArguments()[1],
+                                        (long) invocationOnMock.getArguments()[2]));
 
         AutoPromoter promoter = new AutoPromoter(context);
         // No build. No previous deploy
@@ -265,7 +259,7 @@ public class AutoPromoteDeployTest {
     /* Autopromote enabled for any new build. Have previous deploy but from different deploy*/
     @Test
     public void testPredDeployDelayPromote() throws Exception {
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setPred_stage("pred");
         promoteBean.setDelay(10); // minutes
@@ -273,10 +267,10 @@ public class AutoPromoteDeployTest {
         DeployBean prevDeploy = new DeployBean();
         prevDeploy.setDeploy_id("deploy1");
         prevDeploy.setEnv_id(predEnvironBean.getEnv_id());
-        prevDeploy.setStart_date(now.minusMinutes(60).getMillis());
+        prevDeploy.setStart_date(now.minusSeconds(3600).toEpochMilli());
         DeployBean currentDeploy = new DeployBean();
         currentDeploy.setDeploy_id("deploy2");
-        currentDeploy.setStart_date(now.minusMinutes(25).getMillis());
+        currentDeploy.setStart_date(now.minusSeconds(1500).toEpochMilli());
         currentDeploy.setFrom_deploy(prevDeploy.getDeploy_id());
 
         DeployBean newDeploy = new DeployBean();
@@ -293,20 +287,16 @@ public class AutoPromoteDeployTest {
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
         when(deployDAO.getById(prevDeploy.getDeploy_id())).thenReturn(prevDeploy);
         when(deployDAO.getById(newDeploy.getDeploy_id())).thenReturn(newDeploy);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(
-                        new Answer<List<DeployBean>>() {
-                            @Override
-                            public List<DeployBean> answer(InvocationOnMock invocationOnMock)
-                                    throws Throwable {
-                                return getAcceptedDeploysDelayed(
+                        invocationOnMock ->
+                                getAcceptedDeploysDelayed(
                                         (String) invocationOnMock.getArguments()[0],
-                                        (Interval) invocationOnMock.getArguments()[1]);
-                            }
-                        });
+                                        (long) invocationOnMock.getArguments()[1],
+                                        (long) invocationOnMock.getArguments()[2]));
         AutoPromoter promoter = new AutoPromoter(context);
         // Pre deploy is 6 minutes ago, delay is 10 minutes
-        newDeploy.setStart_date(now.minusMinutes(6).getMillis());
+        newDeploy.setStart_date(now.minusSeconds(360).toEpochMilli());
         PromoteResult result =
                 promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
         assertEquals(PromoteResult.ResultCode.NoCandidateWithinDelayPeriod, result.getResult());
@@ -315,7 +305,7 @@ public class AutoPromoteDeployTest {
                 .thenReturn(Arrays.asList(build3));
 
         // Set predeploy to 11 minutes, delay is 10 minutes
-        newDeploy.setStart_date(now.minusMinutes(11).getMillis());
+        newDeploy.setStart_date(now.minusSeconds(660).toEpochMilli());
         result = promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
         assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
     }
@@ -323,7 +313,7 @@ public class AutoPromoteDeployTest {
     /* Autopromote enabled for any new build. Have previous deploy but from different deploy*/
     @Test
     public void testPredDeployWithDelayPromote() throws Exception {
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setPred_stage("pred");
         promoteBean.setDelay(10); // minutes
@@ -340,24 +330,20 @@ public class AutoPromoteDeployTest {
         build1.setBuild_name("buildname");
         build1.setBuild_id("build1");
 
-        currentDeploy.setStart_date(now.minusMinutes(25).getMillis());
+        currentDeploy.setStart_date(now.minusSeconds(1500).toEpochMilli());
         allDeployBeans.add(newDeploy);
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
         when(deployDAO.getById("deploy1")).thenReturn(newDeploy);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(
-                        new Answer<List<DeployBean>>() {
-                            @Override
-                            public List<DeployBean> answer(InvocationOnMock invocationOnMock)
-                                    throws Throwable {
-                                return getAcceptedDeploysDelayed(
+                        invocationOnMock ->
+                                getAcceptedDeploysDelayed(
                                         (String) invocationOnMock.getArguments()[0],
-                                        (Interval) invocationOnMock.getArguments()[1]);
-                            }
-                        });
+                                        (long) invocationOnMock.getArguments()[1],
+                                        (long) invocationOnMock.getArguments()[2]));
         AutoPromoter promoter = new AutoPromoter(context);
         // Pre deploy is 6 minutes ago, delay is 10 minutes
-        newDeploy.setStart_date(now.minusMinutes(6).getMillis());
+        newDeploy.setStart_date(now.minusSeconds(360).toEpochMilli());
         PromoteResult result =
                 promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
         assertEquals(PromoteResult.ResultCode.NoCandidateWithinDelayPeriod, result.getResult());
@@ -366,14 +352,15 @@ public class AutoPromoteDeployTest {
                 .thenReturn(Arrays.asList(build1));
 
         // Set predeploy to 11 minutes, delay is 10 minutes
-        newDeploy.setStart_date(now.minusMinutes(11).getMillis());
+        newDeploy.setStart_date(now.minusSeconds(660).toEpochMilli());
         result = promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
         assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
     }
 
     @Test
     public void testScheduledPromote() throws Exception {
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
+        LocalDateTime nowLocal = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setSchedule(CronTenAMPerDay);
         promoteBean.setPred_stage("pred");
@@ -404,45 +391,49 @@ public class AutoPromoteDeployTest {
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
         when(deployDAO.getById(prevDeploy.getDeploy_id())).thenReturn(prevDeploy);
         when(deployDAO.getById(newDeploy.getDeploy_id())).thenReturn(newDeploy);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(
-                        new Answer<List<DeployBean>>() {
-                            @Override
-                            public List<DeployBean> answer(InvocationOnMock invocationOnMock)
-                                    throws Throwable {
-                                return getAcceptedDeploysDelayed(
+                        invocationOnMock ->
+                                getAcceptedDeploysDelayed(
                                         (String) invocationOnMock.getArguments()[0],
-                                        (Interval) invocationOnMock.getArguments()[1]);
-                            }
-                        });
+                                        (long) invocationOnMock.getArguments()[1],
+                                        (long) invocationOnMock.getArguments()[2]));
 
-        if (now.getHourOfDay() >= 10) {
-            DateTime cuttingPoint =
-                    new DateTime(
-                            now.getYear(), now.getMonthOfYear(), now.getDayOfMonth(), 10, 0, 0);
+        if (nowLocal.getHour() >= 10) {
+            Instant cuttingPoint =
+                    LocalDateTime.of(
+                                    nowLocal.getYear(),
+                                    nowLocal.getMonthValue(),
+                                    nowLocal.getDayOfMonth(),
+                                    10,
+                                    0,
+                                    0)
+                            .toInstant(ZoneOffset.UTC);
 
-            prevDeploy.setStart_date(cuttingPoint.minusHours(3).getMillis());
-            currentDeploy.setStart_date(cuttingPoint.minusHours(2).getMillis());
-            newDeploy.setStart_date(cuttingPoint.minusHours(1).getMillis());
+            prevDeploy.setStart_date(cuttingPoint.minusSeconds(10800).toEpochMilli());
+            currentDeploy.setStart_date(cuttingPoint.minusSeconds(7200).toEpochMilli());
+            newDeploy.setStart_date(cuttingPoint.minusSeconds(3600).toEpochMilli());
             AutoPromoter promoter = new AutoPromoter(context);
             PromoteResult result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
-            promoteBean.setDelay(1 + (int) (now.getMillis() - newDeploy.getStart_date()) / 60000);
+            promoteBean.setDelay(
+                    1 + (int) (now.toEpochMilli() - newDeploy.getStart_date()) / 60000);
             result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.NoCandidateWithinDelayPeriod, result.getResult());
 
         } else {
             // Before 10 am. Need newdeploy to be >25 hours
-            prevDeploy.setStart_date(now.minusHours(27).getMillis());
-            currentDeploy.setStart_date(now.minusHours(26).getMillis());
-            newDeploy.setStart_date(now.minusHours(25).getMillis());
+            prevDeploy.setStart_date(now.minusSeconds(97200).toEpochMilli());
+            currentDeploy.setStart_date(now.minusSeconds(93600).toEpochMilli());
+            newDeploy.setStart_date(now.minusSeconds(90000).toEpochMilli());
             AutoPromoter promoter = new AutoPromoter(context);
             PromoteResult result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
-            promoteBean.setDelay(1 + (int) (now.getMillis() - newDeploy.getStart_date()) / 60000);
+            promoteBean.setDelay(
+                    1 + (int) (now.toEpochMilli() - newDeploy.getStart_date()) / 60000);
             result =
                     promoter.computePromoteDeployResult(
                             environBean, currentDeploy, 10, promoteBean);
@@ -452,7 +443,8 @@ public class AutoPromoteDeployTest {
 
     @Test
     public void testScheduledPromote2() throws Exception {
-        DateTime now = DateTime.now();
+        Instant now = Instant.now();
+        LocalDateTime nowLocal = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
         PromoteBean promoteBean = new PromoteBean();
         promoteBean.setSchedule(CronWorkTimePerDay);
         promoteBean.setPred_stage("pred");
@@ -483,41 +475,39 @@ public class AutoPromoteDeployTest {
         when(environDAO.getByStage(environBean.getEnv_name(), "pred")).thenReturn(predEnvironBean);
         when(deployDAO.getById(prevDeploy.getDeploy_id())).thenReturn(prevDeploy);
         when(deployDAO.getById(newDeploy.getDeploy_id())).thenReturn(newDeploy);
-        when(deployDAO.getAcceptedDeploys(anyString(), any(), anyInt()))
+        when(deployDAO.getAcceptedDeploys(anyString(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(
-                        new Answer<List<DeployBean>>() {
-                            @Override
-                            public List<DeployBean> answer(InvocationOnMock invocationOnMock)
-                                    throws Throwable {
-                                return getAcceptedDeploysDelayed(
+                        invocationOnMock ->
+                                getAcceptedDeploysDelayed(
                                         (String) invocationOnMock.getArguments()[0],
-                                        (Interval) invocationOnMock.getArguments()[1]);
-                            }
-                        });
+                                        (long) invocationOnMock.getArguments()[1],
+                                        (long) invocationOnMock.getArguments()[2]));
 
-        if (now.getHourOfDay() >= 9 && now.getHourOfDay() <= 17) {
-            prevDeploy.setStart_date(now.minusHours(25).getMillis());
-            currentDeploy.setStart_date(now.minusHours(24).getMillis());
-            newDeploy.setStart_date(now.minusHours(now.getHourOfDay()).getMillis());
+        if (nowLocal.getHour() >= 9 && nowLocal.getHour() <= 17) {
+            prevDeploy.setStart_date(now.minusSeconds(90000).toEpochMilli());
+            currentDeploy.setStart_date(now.minusSeconds(86400).toEpochMilli());
+            newDeploy.setStart_date(now.minusSeconds(nowLocal.getHour() * 3600L).toEpochMilli());
             AutoPromoter promoter = new AutoPromoter(context);
             PromoteResult result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
 
-            promoteBean.setDelay(1 + (int) (now.getMillis() - newDeploy.getStart_date()) / 60000);
+            promoteBean.setDelay(
+                    1 + (int) (now.toEpochMilli() - newDeploy.getStart_date()) / 60000);
             result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.NoCandidateWithinDelayPeriod, result.getResult());
 
         } else {
-            prevDeploy.setStart_date(now.minusHours(27).getMillis());
-            currentDeploy.setStart_date(now.minusHours(26).getMillis());
-            newDeploy.setStart_date(now.minusHours(25).getMillis());
+            prevDeploy.setStart_date(now.minusSeconds(97200).toEpochMilli());
+            currentDeploy.setStart_date(now.minusSeconds(93600).toEpochMilli());
+            newDeploy.setStart_date(now.minusSeconds(90000).toEpochMilli());
             AutoPromoter promoter = new AutoPromoter(context);
             PromoteResult result =
                     promoter.computePromoteDeployResult(environBean, currentDeploy, 1, promoteBean);
             assertEquals(PromoteResult.ResultCode.PromoteDeploy, result.getResult());
-            promoteBean.setDelay(1 + (int) (now.getMillis() - newDeploy.getStart_date()) / 60000);
+            promoteBean.setDelay(
+                    1 + (int) (now.toEpochMilli() - newDeploy.getStart_date()) / 60000);
             result =
                     promoter.computePromoteDeployResult(
                             environBean, currentDeploy, 10, promoteBean);

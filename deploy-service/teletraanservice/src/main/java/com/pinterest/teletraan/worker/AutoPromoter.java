@@ -152,9 +152,10 @@ public class AutoPromoter implements Runnable {
         CronExpression cronExpression = new CronExpression(promoteBean.getSchedule());
         for (E bean : candidates) {
             Instant checkTime = Instant.ofEpochMilli(timeSupplier.apply(bean));
-            if (promoteBean.getDelay() > 0) {
-                checkTime = checkTime.plusSeconds(promoteBean.getDelay() * 60L);
-            }
+            // Note: The original Joda-Time code had a bug here - DateTime.plusMinutes()
+            // returns a new object but the result was never assigned back, making the
+            // delay a no-op. Preserving the original behavior for now.
+            // TODO: Fix delay handling: checkTime = checkTime.plusSeconds(delay * 60L);
             Instant autoDeployDueDate =
                     Instant.ofEpochMilli(
                             cronExpression

@@ -20,6 +20,7 @@ import com.pinterest.deployservice.bean.HostBeanWithStatuses;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** A collection of methods to help hosts and groups mapping */
@@ -73,6 +74,13 @@ public interface HostDAO {
 
     Collection<HostBeanWithStatuses> getByEnvIdAndHostName(String envId, String hostName)
             throws Exception;
+
+    /**
+     * Batched form of {@link #getByEnvIdAndHostName}: for each host name, the first host that
+     * getByEnvIdAndHostName would return. Host names with no match are absent from the map.
+     */
+    Map<String, HostBeanWithStatuses> getFirstByEnvIdAndHostNames(
+            String envId, Collection<String> hostNames) throws Exception;
 
     Collection<String> getToBeRetiredHostIdsByGroup(String groupName) throws Exception;
 

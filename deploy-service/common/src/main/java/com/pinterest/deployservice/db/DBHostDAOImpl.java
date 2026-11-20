@@ -27,7 +27,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.dbcp.BasicDataSource;
@@ -85,6 +88,11 @@ public class DBHostDAOImpl implements HostDAO {
             "SELECT hs.*, ha.normandie_status, ha.knox_status FROM hosts hs INNER JOIN groups_and_envs ge ON ge.group_name = hs.group_name LEFT JOIN hosts_and_agents ha ON ha.host_id = hs.host_id WHERE ge.env_id=? AND hs.host_name=?";
     private static final String GET_HOST_BY_ENVID_AND_HOSTNAME2 =
             "SELECT hs.*, ha.normandie_status, ha.knox_status FROM hosts hs INNER JOIN hosts_and_envs he ON he.host_name = hs.host_name LEFT JOIN hosts_and_agents ha ON ha.host_id = hs.host_id WHERE he.env_id=? AND he.host_name=?";
+    private static final String GET_HOSTS_BY_ENVID_AND_HOSTNAMES1 =
+            "SELECT hs.*, ha.normandie_status, ha.knox_status FROM hosts hs INNER JOIN groups_and_envs ge ON ge.group_name = hs.group_name LEFT JOIN hosts_and_agents ha ON ha.host_id = hs.host_id WHERE ge.env_id=? AND hs.host_name IN (%s)";
+    private static final String GET_HOSTS_BY_ENVID_AND_HOSTNAMES2 =
+            "SELECT hs.*, ha.normandie_status, ha.knox_status FROM hosts hs INNER JOIN hosts_and_envs he ON he.host_name = hs.host_name LEFT JOIN hosts_and_agents ha ON ha.host_id = hs.host_id WHERE he.env_id=? AND he.host_name IN (%s)";
+    private static final int HOST_NAMES_BATCH_SIZE = 1000;
     private static final String GET_RETIRED_HOSTIDS_BY_GROUP =
             "SELECT DISTINCT host_id FROM hosts WHERE (can_retire=1 OR can_retire=3) AND group_name=? AND state not in (?,?,?) ORDER BY can_retire";
     private static final String GET_RETIRED_AND_FAILED_HOSTIDS_BY_GROUP =
@@ -335,6 +343,44 @@ public class DBHostDAOImpl implements HostDAO {
                     .query(GET_HOST_BY_ENVID_AND_HOSTNAME2, h, envId, hostName);
         }
         return hostBeans;
+    }
+
+    @Override
+    public Map<String, HostBeanWithStatuses> getFirstByEnvIdAndHostNames(
+            String envId, Collection<String> hostNames) throws Exception {
+        Map<String, HostBeanWithStatuses> result = new HashMap<>();
+        addFirstHostByName(result, GET_HOSTS_BY_ENVID_AND_HOSTNAMES1, envId, hostNames);
+        List<String> unmatched =
+                hostNames.stream()
+                        .filter(name -> !result.containsKey(name))
+                        .collect(Collectors.toList());
+        addFirstHostByName(result, GET_HOSTS_BY_ENVID_AND_HOSTNAMES2, envId, unmatched);
+        return result;
+    }
+
+    private void addFirstHostByName(
+            Map<String, HostBeanWithStatuses> result,
+            String queryTemplate,
+            String envId,
+            Collection<String> hostNames)
+            throws Exception {
+        ResultSetHandler<List<HostBeanWithStatuses>> h =
+                new BeanListHandler<>(HostBeanWithStatuses.class);
+        List<String> names = new ArrayList<>(new LinkedHashSet<>(hostNames));
+        for (int from = 0; from < names.size(); from += HOST_NAMES_BATCH_SIZE) {
+            List<String> batch =
+                    names.subList(from, Math.min(from + HOST_NAMES_BATCH_SIZE, names.size()));
+            Object[] params = new Object[batch.size() + 1];
+            params[0] = envId;
+            for (int i = 0; i < batch.size(); i++) {
+                params[i + 1] = batch.get(i);
+            }
+            String query =
+                    String.format(queryTemplate, QueryUtils.genStringPlaceholderList(batch.size()));
+            for (HostBeanWithStatuses bean : new QueryRunner(dataSource).query(query, h, params)) {
+                result.putIfAbsent(bean.getHost_name(), bean);
+            }
+        }
     }
 
     @Override

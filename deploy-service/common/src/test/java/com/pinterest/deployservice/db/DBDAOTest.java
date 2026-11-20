@@ -85,6 +85,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -899,6 +900,29 @@ public class DBDAOTest {
         assertEquals(hostBeanNormandie2.getHost_name(), "host-normandie");
         assertEquals(NormandieStatus.OK, hostBeanNormandie2.getNormandie_status());
         assertEquals(KnoxStatus.ERROR, hostBeanNormandie2.getKnox_status());
+
+        // Batched lookup matches the per-host lookup, via groups_and_envs and hosts_and_envs
+        groupDAO.addGroupCapacity("e-3", "new_group");
+        List<String> lookupNames = Arrays.asList("host-3", "host-normandie", "host-unknown");
+        Map<String, HostBeanWithStatuses> batched =
+                hostDAO.getFirstByEnvIdAndHostNames("e-3", lookupNames);
+        assertEquals(2, batched.size());
+        for (String name : lookupNames) {
+            Collection<HostBeanWithStatuses> single = hostDAO.getByEnvIdAndHostName("e-3", name);
+            if (single.isEmpty()) {
+                assertFalse(batched.containsKey(name));
+            } else {
+                HostBeanWithStatuses expected = single.iterator().next();
+                HostBeanWithStatuses actual = batched.get(name);
+                assertEquals(expected.getHost_id(), actual.getHost_id());
+                assertEquals(expected.getGroup_name(), actual.getGroup_name());
+                assertEquals(expected.getState(), actual.getState());
+                assertEquals(expected.getNormandie_status(), actual.getNormandie_status());
+                assertEquals(expected.getKnox_status(), actual.getKnox_status());
+            }
+        }
+        groupDAO.removeGroupCapacity("e-3", "new_group");
+        assertTrue(hostDAO.getFirstByEnvIdAndHostNames("e-3", new ArrayList<>()).isEmpty());
     }
 
     @Test

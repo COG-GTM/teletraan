@@ -494,11 +494,14 @@ public class EnvironHandler {
         }
 
         List<HostBean> newHosts = new ArrayList<>();
-        for (String hostName : capacityHosts) {
-            Collection<HostBeanWithStatuses> hostBeans =
-                    hostDAO.getByEnvIdAndHostName(envBean.getEnv_id(), hostName);
-            if (!hostBeans.isEmpty()) {
-                newHosts.add(hostBeans.iterator().next());
+        if (!capacityHosts.isEmpty()) {
+            Map<String, HostBeanWithStatuses> hostsByName =
+                    hostDAO.getFirstByEnvIdAndHostNames(envBean.getEnv_id(), capacityHosts);
+            for (String hostName : capacityHosts) {
+                HostBeanWithStatuses hostBean = hostsByName.get(hostName);
+                if (hostBean != null) {
+                    newHosts.add(hostBean);
+                }
             }
         }
 
